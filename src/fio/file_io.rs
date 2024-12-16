@@ -109,4 +109,19 @@ mod tests {
 
         std::fs::remove_file(path).unwrap();
     }
+
+    #[test]
+    fn test_file_io_sync() {
+        let path = PathBuf::from("/tmp/a.data");
+        let file = FileIO::new(&path).unwrap();
+
+        let res = file.write("key-a".as_bytes()).unwrap();
+        assert_eq!(res, 5);
+
+        let res = file.write("key-b".as_bytes()).unwrap();
+        assert_eq!(res, 5);
+
+        assert!(file.sync().is_ok());
+        std::fs::remove_file(path).unwrap();
+    }
 }
