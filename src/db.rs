@@ -34,7 +34,6 @@ impl Engine {
             value: value.to_vec(),
             rec_type: LogRecordType::NORMAL,
         };
-
         // 将一条LogRecord追加写入活跃数据文件中
         let log_record_pos = self.append_log_record(&mut record)?;
         // 更新内存索引
@@ -78,5 +77,38 @@ impl Engine {
             file_id: active_file.get_file_id(),
             offset: write_offset,
         })
+    }
+    /// 根据key获得对应的value
+    pub fn get(&self, key: Bytes) -> Result<Bytes> {
+        if key.is_empty() {
+            return Err(Error::KeyIsEmpty);
+        }
+        // 从内存索引获取key对应的位置信息
+        let log_record_pos = self.index.get(key.to_vec());
+        if log_record_pos.is_none() {
+            return Err(Error::KeyNotFound);
+        }
+        let log_record_pos = log_record_pos.unwrap();
+        let log_record;
+        // 先尝试读取活跃数据文件
+        if self.active_file.read().get_file_id() == log_record_pos.file_id {
+            log_record = self
+                .active_file
+                .read()
+                .read_log_record(log_record_pos.offset)?;
+        } else {
+            let older_files = self.older_files.read();
+            let data_file = older_files.get(&log_record_pos.file_id);
+            // 找不到对应的数据文件
+            if data_file.is_none() {
+                return Err(Error::DataFileNotFound);
+            }
+            log_record = data_file.unwrap().read_log_record(log_record_pos.offset)?;
+        }
+        // 判断record类型
+        if log_record.rec_type == LogRecordType::DELETED {
+            return Err(Error::KeyNotFound);
+        }
+        Ok(log_record.value.into())
     }
 }

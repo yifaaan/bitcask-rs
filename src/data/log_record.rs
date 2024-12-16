@@ -12,6 +12,7 @@ pub struct LogRecordPos {
     pub(crate) offset: u64,
 }
 
+#[derive(PartialEq)]
 pub enum LogRecordType {
     NORMAL = 1,
     DELETED = 2,

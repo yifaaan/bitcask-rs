@@ -21,6 +21,12 @@ pub enum Error {
 
     #[error("index update failed")]
     IndexUpdateFail,
+
+    #[error("key not found in database")]
+    KeyNotFound,
+
+    #[error("data file not found in database")]
+    DataFileNotFound,
 }
 
 pub type Result<T> = result::Result<T, Error>;

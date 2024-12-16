@@ -6,6 +6,8 @@ use parking_lot::RwLock;
 use crate::error::Result;
 use crate::fio;
 
+use super::log_record::LogRecord;
+
 /// 数据文件
 pub struct DataFile {
     /// 数据文件id
@@ -35,5 +37,9 @@ impl DataFile {
     /// 持久化数据文件
     pub fn sync(&self) -> Result<()> {
         self.io_manager.sync()
+    }
+    /// 读取一条LogRecord
+    pub fn read_log_record(&self, offset: u64) -> Result<LogRecord> {
+        todo!()
     }
 }
