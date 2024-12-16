@@ -68,3 +68,45 @@ impl IOManager for FileIO {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn test_file_io_write() {
+        let path = PathBuf::from("/tmp/a.data");
+        let file = FileIO::new(&path).unwrap();
+
+        let res = file.write("key-a".as_bytes()).unwrap();
+        assert_eq!(res, 5);
+
+        let res = file.write("key-b".as_bytes()).unwrap();
+        assert_eq!(res, 5);
+
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_file_io_read() {
+        let path = PathBuf::from("/tmp/b.data");
+        let file = FileIO::new(&path).unwrap();
+
+        let res = file.write("key-a".as_bytes()).unwrap();
+        assert_eq!(res, 5);
+
+        let res = file.write("key-b".as_bytes()).unwrap();
+        assert_eq!(res, 5);
+
+        let mut buf = [0; 5];
+        file.read(&mut buf, 0).unwrap();
+        assert_eq!(buf, "key-a".as_bytes());
+
+        file.read(&mut buf, 5).unwrap();
+        assert_eq!(buf, "key-b".as_bytes());
+
+        std::fs::remove_file(path).unwrap();
+    }
+}
