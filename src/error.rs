@@ -15,6 +15,12 @@ pub enum Error {
 
     #[error("failed to open data file")]
     FailedToOpenDataFile,
+
+    #[error("key is empty")]
+    KeyIsEmpty,
+
+    #[error("index update failed")]
+    IndexUpdateFail,
 }
 
 pub type Result<T> = result::Result<T, Error>;
