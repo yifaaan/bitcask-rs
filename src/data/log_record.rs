@@ -18,6 +18,12 @@ pub enum LogRecordType {
     DELETED = 2,
 }
 
+/// 从数据文件读取的log_record和它的size
+pub struct ReadLogRecord {
+    pub record: LogRecord,
+    pub size: u64,
+}
+
 impl LogRecord {
     pub fn encode(&mut self) -> Vec<u8> {
         Vec::new()

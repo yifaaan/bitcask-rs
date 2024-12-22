@@ -2,7 +2,7 @@ use std::result;
 
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("failed to read from data file")]
     FailedToReadFromDataFile,
@@ -27,6 +27,24 @@ pub enum Error {
 
     #[error("data file not found in database")]
     DataFileNotFound,
+
+    #[error("database dir can not be empty")]
+    DirPathIsEmpty,
+
+    #[error("database data file size must be greater than 0")]
+    DataFileSizeTooSmall,
+
+    #[error("failed to create database dir")]
+    FailedToCreateDatabaseDir,
+
+    #[error("failed to read database dir")]
+    FailedToReadDatabaseDir,
+
+    #[error("the database directory maybe corrupted")]
+    DataDirectoryCorrupted,
+
+    #[error("read data file eof")]
+    ReadDataFileEof,
 }
 
 pub type Result<T> = result::Result<T, Error>;

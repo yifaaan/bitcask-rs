@@ -6,8 +6,9 @@ use parking_lot::RwLock;
 use crate::error::Result;
 use crate::fio;
 
-use super::log_record::LogRecord;
+use super::log_record::{LogRecord, ReadLogRecord};
 
+pub const DATA_FILE_NAME_SUFFIX: &'static str = ".data";
 /// 数据文件
 pub struct DataFile {
     /// 数据文件id
@@ -26,6 +27,10 @@ impl DataFile {
     pub fn get_write_offset(&self) -> u64 {
         *self.write_offset.read()
     }
+    /// 设置数据文件的写偏移
+    pub fn set_write_offset(&self, offset: u64) {
+        *self.write_offset.write() = offset;
+    }
     /// 获得数据文件id
     pub fn get_file_id(&self) -> u32 {
         *self.file_id.read()
@@ -39,7 +44,7 @@ impl DataFile {
         self.io_manager.sync()
     }
     /// 读取一条LogRecord
-    pub fn read_log_record(&self, offset: u64) -> Result<LogRecord> {
+    pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
         todo!()
     }
 }
