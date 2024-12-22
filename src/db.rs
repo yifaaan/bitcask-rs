@@ -203,10 +203,13 @@ impl Engine {
                     file_id: *file_id,
                     offset,
                 };
-                match log_record.rec_type {
+                let ok = match log_record.rec_type {
                     LogRecordType::NORMAL => self.index.put(log_record.key.clone(), log_record_pos),
                     LogRecordType::DELETED => self.index.delete(log_record.key.clone()),
                 };
+                if !ok {
+                    return Err(Error::IndexUpdateFail);
+                }
                 // 递增offset，增加量为读取的record的大小
                 offset += size;
             }
@@ -214,6 +217,32 @@ impl Engine {
             if i == self.file_ids.len() - 1 {
                 active_file.set_write_offset(offset);
             }
+        }
+        Ok(())
+    }
+
+    /// 根据key删除对应的数据
+    pub fn delete(&self, key: Bytes) -> Result<()> {
+        if key.is_empty() {
+            return Err(Error::KeyIsEmpty);
+        }
+        // 从内存索引查询key是否存在
+        let pos = self.index.get(key.to_vec());
+        if pos.is_none() {
+            return Ok(());
+        }
+        // 构造log_record
+        let mut log_record = LogRecord {
+            key: key.to_vec(),
+            value: Default::default(),
+            rec_type: LogRecordType::DELETED,
+        };
+        // 将log_record追加写入数据文件中
+        self.append_log_record(&mut log_record)?;
+        // 更新内存索引
+        let ok = self.index.delete(key.to_vec());
+        if !ok {
+            return Err(Error::IndexUpdateFail);
         }
         Ok(())
     }
