@@ -11,3 +11,7 @@ pub trait IOManager: Sync + Send {
     /// 持久化
     fn sync(&self) -> Result<()>;
 }
+
+pub fn new_io_manager(file_name: impl AsRef<std::path::Path>) -> Result<impl IOManager> {
+    file_io::FileIO::new(file_name)
+}

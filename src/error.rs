@@ -45,6 +45,9 @@ pub enum Error {
 
     #[error("read data file eof")]
     ReadDataFileEof,
+
+    #[error("invalid log record crc")]
+    InvalidLogRecordCrc,
 }
 
 pub type Result<T> = result::Result<T, Error>;

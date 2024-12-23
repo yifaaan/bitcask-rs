@@ -29,7 +29,6 @@ pub struct Engine {
 }
 
 impl Engine {
-
     pub fn open(opts: Options) -> Result<Self> {
         // 校验配置项
         if let Some(e) = check_options(&opts) {
@@ -72,7 +71,7 @@ impl Engine {
             active_file: Arc::new(RwLock::new(active_file)),
             older_files: Arc::new(RwLock::new(older_files)),
             index: Box::new(new_indexer(option.index_type)),
-            file_ids
+            file_ids,
         };
         engine.load_index_from_data_files()?;
         Ok(engine)
@@ -149,7 +148,8 @@ impl Engine {
             log_record = self
                 .active_file
                 .read()
-                .read_log_record(log_record_pos.offset)?.record;
+                .read_log_record(log_record_pos.offset)?
+                .record;
         } else {
             let older_files = self.older_files.read();
             let data_file = older_files.get(&log_record_pos.file_id);
@@ -157,7 +157,10 @@ impl Engine {
             if data_file.is_none() {
                 return Err(Error::DataFileNotFound);
             }
-            log_record = data_file.unwrap().read_log_record(log_record_pos.offset)?.record;
+            log_record = data_file
+                .unwrap()
+                .read_log_record(log_record_pos.offset)?
+                .record;
         }
         // 判断record类型
         if log_record.rec_type == LogRecordType::DELETED {
@@ -170,7 +173,7 @@ impl Engine {
     /// 遍历数据文件中的内容，依次处理其中的记录
     fn load_index_from_data_files(&self) -> Result<()> {
         if self.file_ids.is_empty() {
-            return Ok(())
+            return Ok(());
         }
         let active_file = self.active_file.read();
         let older_files = self.older_files.read();
@@ -189,7 +192,6 @@ impl Engine {
                 let (log_record, size) = match log_record {
                     Ok(v) => (v.record, v.size),
                     Err(e) => {
-                        
                         if e == Error::ReadDataFileEof {
                             // 读到文件末尾,继续读下一个文件
                             break;
@@ -247,7 +249,6 @@ impl Engine {
         Ok(())
     }
 }
-
 
 fn check_options(opts: &Options) -> Option<Error> {
     let dir_path = opts.dir_path.to_str();
