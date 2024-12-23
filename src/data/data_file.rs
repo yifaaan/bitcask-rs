@@ -104,3 +104,46 @@ fn get_data_file_name(path: impl AsRef<Path>, file_id: u32) -> PathBuf {
     path.as_ref()
         .join(std::format!("{:09}", file_id) + DATA_FILE_NAME_SUFFIX)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_data_file() {
+        let dir_path = std::env::temp_dir();
+        let data_file = DataFile::new(&dir_path, 0).unwrap();
+
+        assert_eq!(data_file.get_file_id(), 0);
+        println!("{:?}", dir_path);
+    }
+
+    #[test]
+    fn test_data_file_write() {
+        let dir_path = std::env::temp_dir();
+        let data_file = DataFile::new(&dir_path, 1).unwrap();
+
+        assert_eq!(data_file.get_file_id(), 1);
+
+        let write = data_file.write("aaa".as_bytes()).unwrap();
+        assert_eq!(write, 3);
+
+        let write = data_file.write("bbb".as_bytes()).unwrap();
+        assert_eq!(write, 3);
+
+        assert_eq!(data_file.get_write_offset(), 6);
+        println!("{:?}", dir_path);
+    }
+
+    #[test]
+    fn test_data_file_sync() {
+        let dir_path = std::env::temp_dir();
+        let data_file = DataFile::new(&dir_path, 2).unwrap();
+
+        assert_eq!(data_file.get_file_id(), 2);
+
+        let write = data_file.write("aaa".as_bytes()).unwrap();
+        assert_eq!(write, 3);
+        assert!(data_file.sync().is_ok());
+    }
+}
