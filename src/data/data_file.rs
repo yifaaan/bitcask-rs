@@ -51,7 +51,10 @@ impl DataFile {
     }
     /// 写入数据文件
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
-        self.io_manager.write(buf)
+        let n_bytes = self.io_manager.write(buf)?;
+        // 更新write_off
+        *self.write_offset.write() += n_bytes as u64;
+        Ok(n_bytes)
     }
     /// 持久化数据文件
     pub fn sync(&self) -> Result<()> {
