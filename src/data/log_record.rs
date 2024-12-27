@@ -2,6 +2,7 @@ use bytes::{BufMut, BytesMut};
 use prost::{encode_length_delimiter, length_delimiter_len};
 
 /// 表示实际写入数据文件的一条数据
+#[derive(Debug)]
 pub struct LogRecord {
     pub(crate) key: Vec<u8>,
     pub(crate) value: Vec<u8>,
@@ -15,7 +16,7 @@ pub struct LogRecordPos {
     pub(crate) offset: u64,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum LogRecordType {
     NORMAL = 1,
     DELETED = 2,
@@ -32,6 +33,7 @@ impl From<u8> for LogRecordType {
 }
 
 /// 从数据文件读取的log_record和它的size
+#[derive(Debug)]
 pub struct ReadLogRecord {
     pub record: LogRecord,
     pub size: u64,

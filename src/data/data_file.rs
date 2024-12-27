@@ -146,4 +146,67 @@ mod tests {
         assert_eq!(write, 3);
         assert!(data_file.sync().is_ok());
     }
+
+    #[test]
+    fn test_data_file_read_log_record() {
+        let dir_path = std::env::temp_dir();
+        println!("dir_path: {}", dir_path.display());
+        let data_file = DataFile::new(&dir_path, 100).unwrap();
+        assert_eq!(data_file.get_file_id(), 100);
+
+        let record = LogRecord {
+            key: "name".into(),
+            value: "bitcast-rs".into(),
+            rec_type: crate::data::log_record::LogRecordType::NORMAL,
+        };
+        let ecd = record.encode();
+        // println!("ecd len: {}", ecd.len()); 21
+        let write_res = data_file.write(&ecd);
+        assert!(write_res.is_ok());
+
+        // 从文件开头读取记录
+        let read_res = data_file.read_log_record(0);
+        assert!(read_res.is_ok());
+        let read_res = read_res.unwrap().record;
+        // println!("{:?}", read_res);
+        assert_eq!(read_res.key, record.key);
+        assert_eq!(read_res.value, record.value);
+        assert_eq!(read_res.rec_type, record.rec_type);
+
+        // 从其他位置读取记录
+        let record = LogRecord {
+            key: "key1".into(),
+            value: "value1".into(),
+            rec_type: crate::data::log_record::LogRecordType::NORMAL,
+        };
+        let ecd = record.encode();
+        // println!("ecd len: {}", ecd.len()); 17
+        let write_res = data_file.write(&ecd);
+        assert!(write_res.is_ok());
+        let read_res = data_file.read_log_record(21);
+        assert!(read_res.is_ok());
+        let read_res = read_res.unwrap().record;
+        // println!("{:?}", read_res);
+        assert_eq!(read_res.key, record.key);
+        assert_eq!(read_res.value, record.value);
+        assert_eq!(read_res.rec_type, record.rec_type);
+
+        // 类型是Deleted
+        let record = LogRecord {
+            key: "key2".into(),
+            value: "value2".into(),
+            rec_type: crate::data::log_record::LogRecordType::DELETED,
+        };
+        let ecd = record.encode();
+        // println!("ecd len: {}", ecd.len()); 17
+        let write_res = data_file.write(&ecd);
+        assert!(write_res.is_ok());
+        let read_res = data_file.read_log_record(38);
+        assert!(read_res.is_ok());
+        let read_res = read_res.unwrap().record;
+        // println!("{:?}", read_res);
+        assert_eq!(read_res.key, record.key);
+        assert_eq!(read_res.value, record.value);
+        assert_eq!(read_res.rec_type, record.rec_type);
+    }
 }
