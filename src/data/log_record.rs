@@ -1,4 +1,5 @@
-use prost::length_delimiter_len;
+use bytes::{BufMut, BytesMut};
+use prost::{encode_length_delimiter, length_delimiter_len};
 
 /// 表示实际写入数据文件的一条数据
 pub struct LogRecord {
@@ -14,7 +15,7 @@ pub struct LogRecordPos {
     pub(crate) offset: u64,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum LogRecordType {
     NORMAL = 1,
     DELETED = 2,
@@ -37,12 +38,53 @@ pub struct ReadLogRecord {
 }
 
 impl LogRecord {
+    /// 对LogRecord编码，返回编码的结果
+    ///
+    /// +-----------+-----------+-----------+-----------+-----------+-----------+
+    /// |   type    | key size  | value size|   key     |    value  |   CRC     |
+    /// +-----------+-----------+-----------+-----------+-----------+-----------+
+    ///      1B          Max:5B    Max:5B       vary         vary        4B
+    ///
     pub fn encode(&mut self) -> Vec<u8> {
-        Vec::new()
+        let (encoded_buf, _) = self.encode_and_get_crc();
+        encoded_buf
     }
 
+    /// 获取LogRecord编码后的CRC
     pub fn get_crc(&self) -> u32 {
-        todo!()
+        let (_, crc) = self.encode_and_get_crc();
+        crc
+    }
+
+    /// LogRecord编码后的长度
+    fn encoded_length(&self) -> usize {
+        std::mem::size_of::<u8>()
+            + length_delimiter_len(self.key.len())
+            + length_delimiter_len(self.value.len())
+            + self.key.len()
+            + self.value.len()
+            + 4
+    }
+
+    fn encode_and_get_crc(&self) -> (Vec<u8>, u32) {
+        // 存放编码结果
+        let mut buf = BytesMut::with_capacity(self.encoded_length());
+        // type
+        buf.put_u8(self.rec_type as u8);
+        // key size
+        encode_length_delimiter(self.key.len(), &mut buf).unwrap();
+        // value size
+        encode_length_delimiter(self.value.len(), &mut buf).unwrap();
+        // key
+        buf.extend_from_slice(&self.key);
+        // value
+        buf.extend_from_slice(&self.value);
+        // CRC
+        let mut hasher = crc32fast::Hasher::new();
+        hasher.update(&buf);
+        let crc = hasher.finalize();
+        buf.put_u32(crc);
+        (buf.into(), crc)
     }
 }
 
