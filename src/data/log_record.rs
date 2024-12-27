@@ -45,7 +45,7 @@ impl LogRecord {
     /// +-----------+-----------+-----------+-----------+-----------+-----------+
     ///      1B          Max:5B    Max:5B       vary         vary        4B
     ///
-    pub fn encode(&mut self) -> Vec<u8> {
+    pub fn encode(&self) -> Vec<u8> {
         let (encoded_buf, _) = self.encode_and_get_crc();
         encoded_buf
     }
@@ -84,6 +84,7 @@ impl LogRecord {
         hasher.update(&buf);
         let crc = hasher.finalize();
         buf.put_u32(crc);
+        // println!("crc: {crc}");
         (buf.into(), crc)
     }
 }
@@ -91,4 +92,42 @@ impl LogRecord {
 /// 获取header的最大长度
 pub fn max_log_record_header_size() -> usize {
     std::mem::size_of::<u8>() + length_delimiter_len(std::u32::MAX as usize) * 2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_log_record_encode() {
+        // 正常的LogRecord编码
+        let recd = LogRecord {
+            key: "name".into(),
+            value: "bitcask-rs".into(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let ec = recd.encode();
+        assert!(ec.len() > 5);
+        assert_eq!(recd.get_crc(), 1020360578);
+
+        // value为空
+        let recd = LogRecord {
+            key: "name".into(),
+            value: Default::default(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let ec = recd.encode();
+        assert!(ec.len() > 5);
+        assert_eq!(recd.get_crc(), 3756865478);
+
+        // 类型为Deleted
+        let recd = LogRecord {
+            key: "name".into(),
+            value: "bitcask-rs".into(),
+            rec_type: LogRecordType::DELETED,
+        };
+        let ec = recd.encode();
+        assert!(ec.len() > 5);
+        assert_eq!(recd.get_crc(), 1867197446);
+    }
 }
