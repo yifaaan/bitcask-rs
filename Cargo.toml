@@ -3,6 +3,10 @@ name = "bitcask-rs"
 version = "0.1.0"
 edition = "2021"
 
+[[example]]
+name = "basic_operation"
+path = "examples/basic_operation.rs"
+
 [dependencies]
 bytes = "1.9.0"
 crc32fast = "1.4.2"
