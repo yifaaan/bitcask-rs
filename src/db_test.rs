@@ -164,3 +164,37 @@ fn test_engine_delete() {
     // 删除测试的文件夹
     std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
 }
+
+#[test]
+fn test_engine_close() {
+    let mut opts = Options::default();
+    opts.dir_path = PathBuf::from("/tmp/bitcask-rs-close");
+    opts.data_file_size = 64 * 1024 * 1024;
+    let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+    let res = engine.put(get_test_key(222), get_test_value(222));
+    assert!(res.is_ok());
+
+    let close = engine.close();
+    assert!(close.is_ok());
+
+    // 删除测试的文件夹
+    std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
+}
+
+#[test]
+fn test_engine_sync() {
+    let mut opts = Options::default();
+    opts.dir_path = PathBuf::from("/tmp/bitcask-rs-sync");
+    opts.data_file_size = 64 * 1024 * 1024;
+    let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+    let res = engine.put(get_test_key(222), get_test_value(222));
+    assert!(res.is_ok());
+
+    let sync = engine.sync();
+    assert!(sync.is_ok());
+
+    // 删除测试的文件夹
+    std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
+}

@@ -255,6 +255,18 @@ impl Engine {
         }
         Ok(())
     }
+
+    /// 关闭数据库
+    pub fn close(&self) -> Result<()> {
+        let read_guard = self.active_file.read();
+        read_guard.sync()
+    }
+
+    /// 持久化当前活跃文件
+    pub fn sync(&self) -> Result<()> {
+        let read_guard = self.active_file.read();
+        read_guard.sync()
+    }
 }
 
 fn check_options(opts: &Options) -> Option<Error> {
