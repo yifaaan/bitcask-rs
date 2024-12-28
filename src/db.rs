@@ -52,6 +52,8 @@ impl Engine {
         }
 
         // 将旧数据文件保存到older_files
+        // 将旧的数据文件放到后面
+        data_files.reverse();
         let mut older_files = HashMap::new();
         if data_files.len() > 1 {
             for _ in 0..=data_files.len() - 2 {

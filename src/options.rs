@@ -29,3 +29,19 @@ pub enum IndexType {
 
     SkipList,
 }
+
+/// 索引迭代器配置
+#[derive(Clone)]
+pub struct IteratorOptions {
+    pub prefix: Vec<u8>,
+    pub reverse: bool,
+}
+
+impl Default for IteratorOptions {
+    fn default() -> Self {
+        Self {
+            prefix: Default::default(),
+            reverse: false,
+        }
+    }
+}

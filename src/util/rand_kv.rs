@@ -1,6 +1,5 @@
 use bytes::Bytes;
 
-
 pub fn get_test_key(i: i32) -> Bytes {
     Bytes::from(std::format!("bitcask-rs-key-{:09}", i))
 }

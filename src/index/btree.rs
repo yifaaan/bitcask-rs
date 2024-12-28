@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::data::log_record::LogRecordPos;
+use crate::options::IteratorOptions;
 
-use super::Indexer;
+use super::{IndexIterator, Indexer};
 
 /// BTree索引，封装了标准库的BTreeMap
 pub struct BTree {
@@ -35,6 +36,63 @@ impl Indexer for BTree {
         let mut write_guard = self.tree.write();
         let remove_res = write_guard.remove(&key);
         remove_res.is_some()
+    }
+
+    fn iter(&self, options: IteratorOptions) -> Box<dyn IndexIterator> {
+        let read_guard = self.tree.read();
+        // 将所有key和pos信息从BTree索引取出来(内存会不够吗)
+        let mut items = read_guard
+            .iter()
+            .map(|(key, pos)| (key.clone(), pos.clone()))
+            .collect::<Vec<_>>();
+        if options.reverse {
+            items.reverse();
+        }
+        Box::new(BTreeIterator {
+            items,
+            curr_index: 0,
+            options,
+        })
+    }
+}
+
+/// BTree索引迭代器
+pub struct BTreeIterator {
+    items: Vec<(Vec<u8>, LogRecordPos)>,
+    curr_index: usize,
+    options: IteratorOptions,
+}
+
+impl IndexIterator for BTreeIterator {
+    fn rewind(&mut self) {
+        self.curr_index = 0;
+    }
+
+    fn seek(&mut self, key: Vec<u8>) {
+        self.curr_index = match self.items.binary_search_by(|(x, _)| {
+            if self.options.reverse {
+                x.cmp(&key).reverse()
+            } else {
+                x.cmp(&key)
+            }
+        }) {
+            Ok(equal_idx) => equal_idx,
+            Err(insert_idx) => insert_idx,
+        };
+    }
+
+    fn next(&mut self) -> Option<(&[u8], &LogRecordPos)> {
+        if self.curr_index >= self.items.len() {
+            return None;
+        }
+        while let Some(item) = self.items.get(self.curr_index) {
+            self.curr_index += 1;
+            let prefix = &self.options.prefix;
+            if prefix.is_empty() || item.0.starts_with(prefix) {
+                return Some((&item.0, &item.1));
+            }
+        }
+        None
     }
 }
 
