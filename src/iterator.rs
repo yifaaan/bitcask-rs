@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use parking_lot::RwLock;
 
-use crate::{db::Engine, index::IndexIterator, options::IteratorOptions};
+use crate::{db::Engine, error::Result, index::IndexIterator, options::IteratorOptions};
 
 /// 用户使用的迭代器
 pub struct Iterator<'a> {
@@ -20,6 +20,25 @@ impl Engine {
             index_iter: Arc::new(RwLock::new(self.index.iter(options))),
             engine: self,
         }
+    }
+
+    /// 获取所有key
+    pub fn list_keys(&self) -> Result<Vec<Bytes>> {
+        self.index.list_keys()
+    }
+
+    /// 对所有数据执行函数操作，函数返回false就终止
+    pub fn fold<F>(&self, f: F) -> Result<()>
+    where
+        F: Fn(Bytes, Bytes) -> bool,
+    {
+        let iter = self.iter(IteratorOptions::default());
+        while let Some((key, value)) = iter.next() {
+            if !f(key, value) {
+                break;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -165,6 +184,69 @@ mod tests {
             assert!(item.0.len() > 0);
         }
 
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
+    }
+
+    #[test]
+    fn test_list_keys() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-list_keys");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let keys = engine.list_keys();
+        assert!(keys.unwrap().len() == 0);
+
+        let res = engine.put(Bytes::from("eecc"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("bbac"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ccde"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ddce"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ddbe"), get_test_key(10));
+        assert!(res.is_ok());
+        let keys = engine.list_keys();
+        // println!("{:?}", keys); Ok([b"bbac", b"ccde", b"ddbe", b"ddce", b"eecc"])
+        assert!(keys.unwrap().len() == 5);
+
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
+    }
+
+    #[test]
+    fn test_fold() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-fold");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let res = engine.put(Bytes::from("eecc"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("bbac"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ccde"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ddce"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ddbe"), get_test_key(10));
+        assert!(res.is_ok());
+
+        engine
+            .fold(|key, value| {
+                // key: b"bbac" value: b"bitcask-rs-key-000000010"
+                // key: b"ccde" value: b"bitcask-rs-key-000000010"
+                // key: b"ddbe" value: b"bitcask-rs-key-000000010"
+                // key: b"ddce" value: b"bitcask-rs-key-000000010"
+                // key: b"eecc" value: b"bitcask-rs-key-000000010"
+                // println!("key: {:?} value: {:?}", key, value);
+                assert!(key.len() > 0);
+                assert!(value.len() > 0);
+                true
+            })
+            .unwrap();
         // 删除测试的文件夹
         std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
     }

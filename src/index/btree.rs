@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -53,6 +54,15 @@ impl Indexer for BTree {
             curr_index: 0,
             options,
         })
+    }
+
+    fn list_keys(&self) -> crate::error::Result<Vec<Bytes>> {
+        let read_guard = self.tree.read();
+        let keys = read_guard
+            .iter()
+            .map(|(key, _)| Bytes::copy_from_slice(key))
+            .collect::<Vec<_>>();
+        Ok(keys)
     }
 }
 

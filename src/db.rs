@@ -143,7 +143,7 @@ impl Engine {
         if log_record_pos.is_none() {
             return Err(Error::KeyNotFound);
         }
-        let log_record_pos =log_record_pos.unwrap();
+        let log_record_pos = log_record_pos.unwrap();
         self.get_value_by_position(&log_record_pos)
     }
 
