@@ -25,19 +25,19 @@ impl Engine {
 
 impl<'a> Iterator<'a> {
     /// 回到迭代器的起点
-    fn rewind(&mut self) {
+    fn rewind(&self) {
         let mut index_iter = self.index_iter.write();
         index_iter.rewind();
     }
 
     /// 根据传入的key，定位到到第一个大于（或小于）等于目标的key
-    fn seek(&mut self, key: Vec<u8>) {
+    fn seek(&self, key: Vec<u8>) {
         let mut index_iter = self.index_iter.write();
         index_iter.seek(key);
     }
 
     /// 跳转到下一个key,value
-    fn next(&mut self) -> Option<(Bytes, Bytes)> {
+    fn next(&self) -> Option<(Bytes, Bytes)> {
         let mut index_iter = self.index_iter.write();
         if let Some(item) = index_iter.next() {
             let value = self
@@ -47,5 +47,125 @@ impl<'a> Iterator<'a> {
             return Some((Bytes::from(item.0.to_vec()), value));
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::{
+        options::Options,
+        util::{self, rand_kv::get_test_key},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_iterator_seek() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-seek");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        // 没有数据的情况
+        let iter = engine.iter(IteratorOptions::default());
+        iter.seek("aa".into());
+        // println!("{:?}", iter.next());
+        assert!(iter.next().is_none());
+
+        // 有一条数据的情况
+        let res = engine.put(Bytes::from("aacc"), get_test_key(10));
+        assert!(res.is_ok());
+        let iter = engine.iter(IteratorOptions::default());
+        iter.seek("a".into());
+        assert!(iter.next().is_some());
+
+        // 有多条数据的情况
+        let res = engine.put(Bytes::from("eecc"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("bbac"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ccde"), get_test_key(10));
+        assert!(res.is_ok());
+        let iter = engine.iter(IteratorOptions::default());
+        iter.seek("a".into());
+        assert_eq!("aacc", iter.next().unwrap().0);
+        // println!("{:?}", iter.next());
+
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
+    }
+
+    #[test]
+    fn test_iterator_next() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-next");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        // 有一条数据的情况
+        let res = engine.put(Bytes::from("aacc"), get_test_key(10));
+        assert!(res.is_ok());
+        let iter = engine.iter(IteratorOptions::default());
+        iter.seek("a".into());
+        assert_eq!("aacc", iter.next().unwrap().0);
+        assert!(iter.next().is_none());
+        iter.rewind();
+        assert_eq!("aacc", iter.next().unwrap().0);
+        assert!(iter.next().is_none());
+
+        // 有多条数据的情况
+        let res = engine.put(Bytes::from("eecc"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("bbac"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ccde"), get_test_key(10));
+        assert!(res.is_ok());
+        let mut iter_opts = IteratorOptions::default();
+        iter_opts.reverse = true;
+        let iter = engine.iter(iter_opts);
+        while let Some(item) = iter.next() {
+            // (b"aacc", b"bitcask-rs-key-000000010")
+            // (b"bbac", b"bitcask-rs-key-000000010")
+            // (b"ccde", b"bitcask-rs-key-000000010")
+            // (b"eecc", b"bitcask-rs-key-000000010")
+            // println!("{:?}", item);
+            assert!(item.0.len() > 0);
+        }
+
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
+    }
+
+    #[test]
+    fn test_iterator_prefix() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-prefix");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let res = engine.put(Bytes::from("eecc"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("bbac"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ccde"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ddce"), get_test_key(10));
+        assert!(res.is_ok());
+        let res = engine.put(Bytes::from("ddbe"), get_test_key(10));
+        assert!(res.is_ok());
+        let mut iter_opts = IteratorOptions::default();
+        iter_opts.prefix = "dd".into();
+        let iter = engine.iter(iter_opts);
+        while let Some(item) = iter.next() {
+            // (b"ddbe", b"bitcask-rs-key-000000010")
+            // (b"ddce", b"bitcask-rs-key-000000010")
+            // println!("{:?}", item);
+            assert!(item.0.len() > 0);
+        }
+
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove path");
     }
 }
