@@ -180,4 +180,151 @@ mod tests {
         let del3 = bt.delete("not exist".as_bytes().to_vec());
         assert!(!del3);
     }
+
+    #[test]
+    fn test_btree_iterator_seek() {
+        let bt = BTree::new();
+        // 没有数据的情况
+        let mut iter = bt.iter(IteratorOptions::default());
+        iter.seek("aa".into());
+
+        let res = iter.next();
+        assert!(res.is_none());
+        // 有一条记录的情况
+        bt.put(
+            "ccde".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        let mut iter = bt.iter(IteratorOptions::default());
+        iter.seek("aa".into());
+        let res = iter.next();
+        assert!(res.is_some());
+
+        let mut iter = bt.iter(IteratorOptions::default());
+        iter.seek("zz".into());
+        let res = iter.next();
+        assert!(res.is_none());
+
+        // 多条记录
+        bt.put(
+            "bbed".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        bt.put(
+            "aaed".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        bt.put(
+            "cadd".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        let mut iter = bt.iter(IteratorOptions::default());
+        iter.seek("b".into());
+        while let Some(item) = iter.next() {
+            // Ok("bbed") Ok("cadd") Ok("ccde")
+            assert!(item.0.len() > 0);
+        }
+
+        let mut iter = bt.iter(IteratorOptions::default());
+        iter.seek("cadd".into());
+        while let Some(item) = iter.next() {
+            // Ok("cadd") Ok("ccde")
+            assert!(item.0.len() > 0);
+            // println!("{:?}", String::from_utf8(item.0.to_vec()));
+        }
+
+        let mut iter = bt.iter(IteratorOptions::default());
+        iter.seek("zzz".into());
+        let res = iter.next();
+        assert!(res.is_none());
+
+        // 反向迭代
+        let mut opts = IteratorOptions::default();
+        opts.reverse = true;
+
+        let mut iter = bt.iter(opts);
+        iter.seek("bb".into());
+        while let Some(item) = iter.next() {
+            // Ok("aaed")
+            assert!(item.0.len() > 0);
+            // println!("{:?}", String::from_utf8(item.0.to_vec()));
+        }
+    }
+
+    #[test]
+    fn test_btree_iterator_next() {
+        let bt = BTree::new();
+        // 没有数据的情况
+        let mut iter = bt.iter(IteratorOptions::default());
+        // println!("{:?}", iter.next());
+        assert!(iter.next().is_none());
+
+        // 有一条记录的情况
+        bt.put(
+            "cadd".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        let mut opts = IteratorOptions::default();
+        opts.reverse = true;
+        let mut iter = bt.iter(opts.clone());
+        assert!(iter.next().is_some());
+
+        // 有多条记录的情况
+        bt.put(
+            "bbed".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        bt.put(
+            "aaed".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        bt.put(
+            "cdea".into(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 10,
+            },
+        );
+        let mut iter = bt.iter(opts.clone());
+        while let Some(item) = iter.next() {
+            // Ok("cdea")
+            // Ok("cadd")
+            // Ok("bbed")
+            // Ok("aaed")
+            assert!(item.0.len() > 0);
+            // println!("{:?}", String::from_utf8(item.0.to_vec()));
+        }
+
+        // 有前缀的情况
+        opts.prefix = "c".into();
+        opts.reverse = false;
+        let mut iter = bt.iter(opts.clone());
+        while let Some(item) = iter.next() {
+            // Ok("cadd")
+            // Ok("cdea")
+            assert!(item.0.len() > 0);
+            // println!("{:?}", String::from_utf8(item.0.to_vec()));
+        }
+    }
 }
