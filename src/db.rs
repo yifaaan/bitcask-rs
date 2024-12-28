@@ -23,7 +23,7 @@ pub struct Engine {
     /// 旧数据文件
     older_files: Arc<RwLock<HashMap<u32, DataFile>>>,
     /// 内存索引
-    index: Box<dyn index::Indexer>,
+    pub(crate) index: Box<dyn index::Indexer>,
     /// 文件id
     file_ids: Vec<u32>,
 }
@@ -143,7 +143,12 @@ impl Engine {
         if log_record_pos.is_none() {
             return Err(Error::KeyNotFound);
         }
-        let log_record_pos = log_record_pos.unwrap();
+        let log_record_pos =log_record_pos.unwrap();
+        self.get_value_by_position(&log_record_pos)
+    }
+
+    /// 根据偏移位置读取value
+    pub(crate) fn get_value_by_position(&self, log_record_pos: &LogRecordPos) -> Result<Bytes> {
         let log_record;
         // 先尝试读取活跃数据文件
         if self.active_file.read().get_file_id() == log_record_pos.file_id {

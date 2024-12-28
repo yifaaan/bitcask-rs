@@ -6,3 +6,4 @@ mod fio;
 mod index;
 pub mod options;
 pub mod util;
+pub mod iterator;
