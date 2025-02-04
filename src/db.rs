@@ -83,4 +83,37 @@ impl Engine {
             offset: write_offset,
         })
     }
+
+    /// 从数据库中读取数据
+    pub fn get(&self, key: Bytes) -> Result<Bytes> {
+        if key.is_empty() {
+            return Err(Error::KeyIsEmpty);
+        }
+        // 从内存索引中获取数据位置
+        let pos = self.index.get(key.to_vec());
+        if pos.is_none() {
+            return Err(Error::KeyNotFound);
+        }
+        let pos = pos.unwrap();
+        // 从数据文件中读取LogRecord数据
+        let active_file = self.active_file.read();
+        let older_files = self.older_files.read();
+        let log_record = match active_file.get_file_id() == pos.file_id {
+            true => active_file.read_log_record(pos.offset)?,
+            false => {
+                let older_file = older_files.get(&pos.file_id);
+                if older_file.is_none() {
+                    return Err(Error::DataFileNotFound);
+                }
+                let older_file = older_file.unwrap();
+                older_file.read_log_record(pos.offset)?
+            }
+        };
+
+        // 判断log record类型
+        match log_record.record_type {
+            LogRecordType::NORMAL => Ok(log_record.value.into()),
+            LogRecordType::DELETE => Err(Error::KeyNotFound),
+        }
+    }
 }

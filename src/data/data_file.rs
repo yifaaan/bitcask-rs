@@ -1,7 +1,9 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
-use crate::error::Result;
+use crate::{error::Result, fio::file_io::FileIO};
 use parking_lot::RwLock;
+
+use super::log_record::LogRecord;
 
 pub struct DataFile {
     /// 文件ID
@@ -33,6 +35,10 @@ impl DataFile {
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
+        todo!()
+    }
+
+    pub fn read_log_record(&self, offset: u64) -> Result<LogRecord> {
         todo!()
     }
 

@@ -21,4 +21,10 @@ pub enum Error {
 
     #[error("Failed to update index")]
     FailedToUpdateIndex,
+
+    #[error("Key not found")]
+    KeyNotFound,
+
+    #[error("Data file not found")]
+    DataFileNotFound,
 }
