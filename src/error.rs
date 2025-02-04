@@ -13,6 +13,12 @@ pub enum Error {
     #[error("Failed to sync data file")]
     FailedToSyncDataFile,
 
+    #[error("Key is empty")]
+    KeyIsEmpty,
+
     #[error("Failed to open data file")]
     FailedToOpenDataFile,
+
+    #[error("Failed to update index")]
+    FailedToUpdateIndex,
 }
