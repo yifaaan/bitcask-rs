@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use crate::{error::Result, fio::file_io::FileIO};
 use parking_lot::RwLock;
 
-use super::log_record::LogRecord;
+use super::log_record::ReadLogRecord;
 
 pub const DATA_FILE_SUFFIX: &str = ".data";
 
@@ -40,8 +40,12 @@ impl DataFile {
         todo!()
     }
 
-    pub fn read_log_record(&self, offset: u64) -> Result<LogRecord> {
+    pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
         todo!()
+    }
+
+    pub fn set_write_offset(&self, offset: u64) {
+        *self.write_offset.write() = offset;
     }
 
     pub fn sync(&self) -> Result<()> {

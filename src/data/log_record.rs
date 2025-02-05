@@ -22,3 +22,9 @@ pub enum LogRecordType {
     NORMAL = 1,
     DELETE = 2,
 }
+
+/// 从数据文件中读取的log record，包含实际的log record和log record的大小
+pub struct ReadLogRecord {
+    pub record: LogRecord,
+    pub size: u64,
+}

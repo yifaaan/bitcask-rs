@@ -43,7 +43,8 @@ impl Engine {
         }
         // 加载目录中的数据文件
         let mut data_files: Vec<DataFile> = load_data_files(&dir_path)?;
-        data_files.reverse();
+        // TODO: fix bug
+        // data_files.reverse();
         let file_ids = data_files
             .iter()
             .map(|f| f.get_file_id())
@@ -69,7 +70,8 @@ impl Engine {
             index: Box::new(index::new_indexer(index_type)),
             file_ids,
         };
-        // TODO: 加载索引
+        // 加载索引
+        engine.load_index_from_data_files()?;
         Ok(engine)
     }
 
@@ -93,6 +95,39 @@ impl Engine {
             return Err(Error::FailedToUpdateIndex);
         }
         Ok(())
+    }
+
+    /// 从数据库中读取数据
+    pub fn get(&self, key: Bytes) -> Result<Bytes> {
+        if key.is_empty() {
+            return Err(Error::KeyIsEmpty);
+        }
+        // 从内存索引中获取数据位置
+        let pos = self.index.get(key.to_vec());
+        if pos.is_none() {
+            return Err(Error::KeyNotFound);
+        }
+        let pos = pos.unwrap();
+        // 从数据文件中读取LogRecord数据
+        let active_file = self.active_file.read();
+        let older_files = self.older_files.read();
+        let log_record = match active_file.get_file_id() == pos.file_id {
+            true => active_file.read_log_record(pos.offset)?.record,
+            false => {
+                let older_file = older_files.get(&pos.file_id);
+                if older_file.is_none() {
+                    return Err(Error::DataFileNotFound);
+                }
+                let older_file = older_file.unwrap();
+                older_file.read_log_record(pos.offset)?.record
+            }
+        };
+
+        // 判断log record类型
+        match log_record.record_type {
+            LogRecordType::NORMAL => Ok(log_record.value.into()),
+            LogRecordType::DELETE => Err(Error::KeyNotFound),
+        }
     }
 
     /// 追加写入活跃数据文件
@@ -135,37 +170,58 @@ impl Engine {
         })
     }
 
-    /// 从数据库中读取数据
-    pub fn get(&self, key: Bytes) -> Result<Bytes> {
-        if key.is_empty() {
-            return Err(Error::KeyIsEmpty);
+    /// 从数据文件中加载索引
+    fn load_index_from_data_files(&self) -> Result<()> {
+        if self.file_ids.is_empty() {
+            return Ok(());
         }
-        // 从内存索引中获取数据位置
-        let pos = self.index.get(key.to_vec());
-        if pos.is_none() {
-            return Err(Error::KeyNotFound);
-        }
-        let pos = pos.unwrap();
-        // 从数据文件中读取LogRecord数据
         let active_file = self.active_file.read();
         let older_files = self.older_files.read();
-        let log_record = match active_file.get_file_id() == pos.file_id {
-            true => active_file.read_log_record(pos.offset)?,
-            false => {
-                let older_file = older_files.get(&pos.file_id);
-                if older_file.is_none() {
-                    return Err(Error::DataFileNotFound);
+        // 遍历数据文件
+        for (i, file_id) in self.file_ids.iter().enumerate() {
+            let mut offset = 0;
+            // 遍历数据文件中的数据
+            loop {
+                let log_record_res = match *file_id == active_file.get_file_id() {
+                    true => active_file.read_log_record(offset),
+                    false => {
+                        let data_file = older_files.get(file_id).unwrap();
+                        data_file.read_log_record(offset)
+                    }
+                };
+                let (log_record, size) = match log_record_res {
+                    Ok(rc) => (rc.record, rc.size),
+                    Err(e) => {
+                        // 读取数据文件结束, 退出循环, 继续遍历下一个数据文件
+                        if e == Error::ReadDataFileEOF {
+                            break;
+                        }
+                        return Err(e);
+                    }
+                };
+                // 更新内存索引
+                let pos = LogRecordPos {
+                    file_id: *file_id,
+                    offset,
+                };
+                match log_record.record_type {
+                    LogRecordType::NORMAL => {
+                        self.index.put(log_record.key.clone(), pos);
+                    }
+                    // 删除数据
+                    LogRecordType::DELETE => {
+                        self.index.delete(log_record.key.clone());
+                    }
                 }
-                let older_file = older_file.unwrap();
-                older_file.read_log_record(pos.offset)?
+                // 更新偏移量
+                offset += size;
             }
-        };
-
-        // 判断log record类型
-        match log_record.record_type {
-            LogRecordType::NORMAL => Ok(log_record.value.into()),
-            LogRecordType::DELETE => Err(Error::KeyNotFound),
+            // 最后一个数据文件处理完了，更新活跃数据文件的偏移量
+            if i == self.file_ids.len() - 1 {
+                active_file.set_write_offset(offset);
+            }
         }
+        Ok(())
     }
 }
 

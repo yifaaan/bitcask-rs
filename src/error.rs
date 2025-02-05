@@ -2,7 +2,7 @@ use crate::data::log_record::LogRecordPos;
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum Error {
     #[error("Failed to read from data file")]
     FailedToReadFromDataFile,
@@ -48,4 +48,7 @@ pub enum Error {
 
     #[error("Failed to create data file")]
     FailedToCreateDataFile,
+
+    #[error("Read data file EOF")]
+    ReadDataFileEOF,
 }
