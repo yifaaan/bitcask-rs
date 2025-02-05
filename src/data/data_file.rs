@@ -51,6 +51,7 @@ impl DataFile {
         Ok(n_bytes)
     }
 
+    /// 从offset处读取log record
     pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
         // log record 的结构
         // 1 byte for log record type
@@ -109,4 +110,55 @@ fn get_data_file_full_path(dir_path: impl AsRef<Path>, file_id: u32) -> PathBuf 
     dir_path
         .as_ref()
         .join(format!("{:09}{}", file_id, DATA_FILE_SUFFIX))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_data_file() {
+        let dir_path = std::env::temp_dir();
+        // println!("dir_path: {}", dir_path.display());
+        let data_file = DataFile::new(&dir_path, 0).unwrap();
+        assert_eq!(data_file.get_file_id(), 0);
+        assert_eq!(data_file.get_write_offset(), 0);
+
+        let data_file = DataFile::new(&dir_path, 0).unwrap();
+        assert_eq!(data_file.get_file_id(), 0);
+        assert_eq!(data_file.get_write_offset(), 0);
+
+        let data_file = DataFile::new(&dir_path, 1).unwrap();
+        assert_eq!(data_file.get_file_id(), 1);
+        assert_eq!(data_file.get_write_offset(), 0);
+    }
+
+    #[test]
+    fn test_data_file_write() {
+        let dir_path = std::env::temp_dir();
+        let data_file = DataFile::new(&dir_path, 0).unwrap();
+        let n_bytes = data_file.write(b"hello").unwrap();
+        assert_eq!(n_bytes, 5);
+        assert_eq!(data_file.get_write_offset(), 5);
+
+        let n_bytes = data_file.write(b"world").unwrap();
+        assert_eq!(n_bytes, 5);
+        assert_eq!(data_file.get_write_offset(), 10);
+
+        let n_bytes = data_file.write(b"111").unwrap();
+        assert_eq!(n_bytes, 3);
+        assert_eq!(data_file.get_write_offset(), 13);
+
+        let n_bytes = data_file.write(b"").unwrap();
+        assert_eq!(n_bytes, 0);
+        assert_eq!(data_file.get_write_offset(), 13);
+    }
+
+    #[test]
+    fn test_data_file_sync() {
+        let dir_path = std::env::temp_dir();
+        let data_file = DataFile::new(&dir_path, 3).unwrap();
+        data_file.write(b"222").unwrap();
+        assert!(data_file.sync().is_ok());
+    }
 }
