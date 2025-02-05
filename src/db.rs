@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use log::warn;
 use parking_lot::RwLock;
 
 use crate::data::data_file::DataFile;
@@ -9,6 +11,8 @@ use crate::data::log_record::{LogRecord, LogRecordPos, LogRecordType};
 use crate::error::{Error, Result};
 use crate::index;
 use crate::options::Options;
+
+const INITIAL_FILE_ID: u32 = 0;
 
 /// 数据库接口
 pub struct Engine {
@@ -19,9 +23,56 @@ pub struct Engine {
     older_files: Arc<RwLock<HashMap<u32, DataFile>>>,
     /// 内存索引
     index: Box<dyn index::Indexer>,
+    /// 数据库启动时，数据文件ID
+    file_ids: Vec<u32>,
 }
 
 impl Engine {
+    /// 打开数据库
+    pub fn open(opts: Options) -> Result<Self> {
+        // 校验配置项
+        check_options(&opts)?;
+        // 判断数据库目录是否存在
+        let dir_path = opts.dir_path.clone();
+        if !dir_path.exists() {
+            // 创建数据库目录
+            if let Err(e) = std::fs::create_dir_all(&dir_path) {
+                warn!("Failed to create database directory: {}", e);
+                return Err(Error::FailedToCreateDbDir);
+            }
+        }
+        // 加载目录中的数据文件
+        let mut data_files: Vec<DataFile> = load_data_files(&dir_path)?;
+        data_files.reverse();
+        let file_ids = data_files
+            .iter()
+            .map(|f| f.get_file_id())
+            .collect::<Vec<_>>();
+        // 保存旧的数据文件
+        let mut older_files = HashMap::new();
+        if data_files.len() > 1 {
+            for _ in 0..data_files.len() - 1 {
+                let f = data_files.pop().unwrap();
+                older_files.insert(f.get_file_id(), f);
+            }
+        };
+        // 获取活跃数据文件
+        let active_file = match data_files.pop() {
+            Some(f) => f,
+            None => DataFile::new(&dir_path, INITIAL_FILE_ID)?,
+        };
+        let index_type = opts.index_type;
+        let engine = Self {
+            options: Arc::new(opts),
+            active_file: Arc::new(RwLock::new(active_file)),
+            older_files: Arc::new(RwLock::new(older_files)),
+            index: Box::new(index::new_indexer(index_type)),
+            file_ids,
+        };
+        // TODO: 加载索引
+        Ok(engine)
+    }
+
     /// 向数据库中写入数据, key不能为空
     pub fn put(&self, key: Bytes, value: Bytes) -> Result<()> {
         if key.is_empty() {
@@ -61,11 +112,11 @@ impl Engine {
             // 将当前活跃数据文件移动到旧数据文件中
             let current_file_id = active_file.get_file_id();
             let mut older_files = self.older_files.write();
-            let old_file = DataFile::new(dir_path.as_ref(), current_file_id)?;
+            let old_file = DataFile::new(&dir_path, current_file_id)?;
             older_files.insert(current_file_id, old_file);
 
             // 创建新的活跃数据文件
-            let new_active_file = DataFile::new(dir_path.as_ref(), current_file_id + 1)?;
+            let new_active_file = DataFile::new(&dir_path, current_file_id + 1)?;
             *active_file = new_active_file;
         }
         // 写入数据到活跃数据文件
@@ -116,4 +167,44 @@ impl Engine {
             LogRecordType::DELETE => Err(Error::KeyNotFound),
         }
     }
+}
+
+/// 校验配置项
+fn check_options(opts: &Options) -> Result<()> {
+    if opts.dir_path.to_str().is_none() || opts.dir_path.to_str().unwrap().is_empty() {
+        return Err(Error::InvalidDbDir);
+    }
+    if opts.data_file_size <= 0 {
+        return Err(Error::InvalidDataFileSize);
+    }
+    Ok(())
+}
+
+/// 加载目录中的数据文件
+fn load_data_files(dir_path: impl AsRef<Path>) -> Result<Vec<DataFile>> {
+    let mut file_ids = Vec::new();
+    let mut data_files = Vec::new();
+    for entry in std::fs::read_dir(dir_path.as_ref()).map_err(|_| Error::FailedToReadDir)? {
+        let entry = entry.map_err(|_| Error::FailedToReadDirEntry)?;
+        let file_os_name = entry.file_name();
+        let file_name = file_os_name.to_str().unwrap();
+        // 判断文件名是否是以.data结尾
+        if file_name.ends_with(crate::data::data_file::DATA_FILE_SUFFIX) {
+            let (id, _) = file_name.split_once(".").unwrap();
+            let id = id.parse::<u32>().map_err(|_| Error::FailedToParseFileId)?;
+            file_ids.push(id);
+        }
+    }
+    if file_ids.is_empty() {
+        return Ok(data_files);
+    }
+
+    file_ids.sort();
+    // 根据file_ids加载数据文件
+    for id in file_ids.iter() {
+        let data_file =
+            DataFile::new(dir_path.as_ref(), *id).map_err(|_| Error::FailedToCreateDataFile)?;
+        data_files.push(data_file);
+    }
+    Ok(data_files)
 }

@@ -27,4 +27,25 @@ pub enum Error {
 
     #[error("Data file not found")]
     DataFileNotFound,
+
+    #[error("Invalid database directory")]
+    InvalidDbDir,
+
+    #[error("Invalid data file size")]
+    InvalidDataFileSize,
+
+    #[error("Failed to create database directory")]
+    FailedToCreateDbDir,
+
+    #[error("Failed to read directory")]
+    FailedToReadDir,
+
+    #[error("Failed to read directory entry")]
+    FailedToReadDirEntry,
+
+    #[error("Failed to parse file id")]
+    FailedToParseFileId,
+
+    #[error("Failed to create data file")]
+    FailedToCreateDataFile,
 }

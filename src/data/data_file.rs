@@ -5,6 +5,8 @@ use parking_lot::RwLock;
 
 use super::log_record::LogRecord;
 
+pub const DATA_FILE_SUFFIX: &str = ".data";
+
 pub struct DataFile {
     /// 文件ID
     file_id: Arc<RwLock<u32>>,
