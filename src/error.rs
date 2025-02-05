@@ -51,4 +51,7 @@ pub enum Error {
 
     #[error("Read data file EOF")]
     ReadDataFileEOF,
+
+    #[error("Invalid log record CRC")]
+    InvalidLogRecordCRC,
 }

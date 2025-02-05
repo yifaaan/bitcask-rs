@@ -1,9 +1,18 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use crate::{error::Result, fio::file_io::FileIO};
+use crate::{
+    data::log_record::max_log_record_header_size,
+    error::{Error, Result},
+    fio::new_io_manager,
+};
+use bytes::{Buf, BytesMut};
 use parking_lot::RwLock;
+use prost::{decode_length_delimiter, length_delimiter_len};
 
-use super::log_record::ReadLogRecord;
+use super::log_record::{LogRecord, ReadLogRecord};
 
 pub const DATA_FILE_SUFFIX: &str = ".data";
 
@@ -18,13 +27,12 @@ pub struct DataFile {
 
 impl DataFile {
     pub fn new(dir_path: impl AsRef<Path>, file_id: u32) -> Result<Self> {
-        let dir_path = dir_path.as_ref();
-        let file_path = dir_path.join(format!("data_file_{}", file_id));
-        let io_manager = Box::new(FileIO::new(file_path)?);
+        let file_path = get_data_file_full_path(&dir_path, file_id);
+        let io_manager = new_io_manager(file_path)?;
         Ok(Self {
             file_id: Arc::new(RwLock::new(file_id)),
             write_offset: Arc::new(RwLock::new(0)),
-            io_manager,
+            io_manager: Box::new(io_manager),
         })
     }
 
@@ -37,18 +45,68 @@ impl DataFile {
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
-        todo!()
+        let n_bytes = self.io_manager.write(buf)?;
+        // 更新写入偏移量
+        *self.write_offset.write() += n_bytes as u64;
+        Ok(n_bytes)
     }
 
     pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
-        todo!()
-    }
+        // log record 的结构
+        // 1 byte for log record type
+        // var bytes for key length
+        // var bytes for value length
+        // key
+        // value
+        // 4 bytes for crc
 
+        // 读取header
+        let mut header_buf = BytesMut::zeroed(max_log_record_header_size());
+        self.io_manager.read(header_buf.as_mut(), offset)?;
+        // 解析header, 获取record type, key length, value length
+        let record_type = header_buf.get_u8();
+        let key_len = decode_length_delimiter(&mut header_buf).unwrap();
+        let value_len = decode_length_delimiter(&mut header_buf).unwrap();
+        // 如果key length和value length都为0, 则表示文件结束
+        if key_len == 0 && value_len == 0 {
+            return Err(Error::ReadDataFileEOF);
+        }
+        // 计算实际的header大小
+        let actual_header_size =
+            length_delimiter_len(key_len) + length_delimiter_len(value_len) + 1;
+        // 读取key, value
+        let mut kv_buf = BytesMut::zeroed(key_len + value_len + 4);
+        self.io_manager
+            .read(&mut kv_buf, offset + actual_header_size as u64)?;
+        // 构造log record
+        let log_record = LogRecord {
+            key: kv_buf.get(..key_len).unwrap().into(),
+            value: kv_buf.get(key_len..kv_buf.len() - 4).unwrap().into(),
+            record_type: record_type.into(),
+        };
+        // 读取crc
+        kv_buf.advance(key_len + value_len);
+        let crc = kv_buf.get_u32();
+        // 验证crc
+        if crc != log_record.get_crc() {
+            return Err(Error::InvalidLogRecordCRC);
+        }
+        Ok(ReadLogRecord {
+            record: log_record,
+            size: actual_header_size + key_len + value_len + 4,
+        })
+    }
     pub fn set_write_offset(&self, offset: u64) {
         *self.write_offset.write() = offset;
     }
 
     pub fn sync(&self) -> Result<()> {
-        todo!()
+        self.io_manager.sync()
     }
+}
+
+fn get_data_file_full_path(dir_path: impl AsRef<Path>, file_id: u32) -> PathBuf {
+    dir_path
+        .as_ref()
+        .join(format!("{:09}{}", file_id, DATA_FILE_SUFFIX))
 }

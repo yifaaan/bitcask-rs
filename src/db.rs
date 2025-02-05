@@ -179,7 +179,7 @@ impl Engine {
         let older_files = self.older_files.read();
         // 遍历数据文件
         for (i, file_id) in self.file_ids.iter().enumerate() {
-            let mut offset = 0;
+            let mut offset: u64 = 0;
             // 遍历数据文件中的数据
             loop {
                 let log_record_res = match *file_id == active_file.get_file_id() {
@@ -214,7 +214,7 @@ impl Engine {
                     }
                 }
                 // 更新偏移量
-                offset += size;
+                offset += size as u64;
             }
             // 最后一个数据文件处理完了，更新活跃数据文件的偏移量
             if i == self.file_ids.len() - 1 {
