@@ -20,3 +20,14 @@ pub enum IndexType {
     /// SkipList
     SkipList,
 }
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            dir_path: std::env::temp_dir().join("bitcast-rs"),
+            data_file_size: 1024 * 1024,
+            sync_write: false,
+            index_type: IndexType::BTree,
+        }
+    }
+}

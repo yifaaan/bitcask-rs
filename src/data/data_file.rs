@@ -72,7 +72,7 @@ impl DataFile {
         if key_len == 0 && value_len == 0 {
             return Err(Error::ReadDataFileEOF);
         }
-        // 计算实际的header大小
+        // 计算实际的header大小(编码后)
         let actual_header_size =
             length_delimiter_len(key_len) + length_delimiter_len(value_len) + 1;
         // 读取key, value

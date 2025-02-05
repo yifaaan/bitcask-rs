@@ -130,6 +130,12 @@ impl Engine {
         }
     }
 
+    /// 从数据库中删除数据
+    pub fn delete(&self, key: Bytes) -> Result<()> {
+        // TODO:
+        unimplemented!()
+    }
+
     /// 追加写入活跃数据文件
     fn append_log_record(&self, record: &mut LogRecord) -> Result<LogRecordPos> {
         // 数据库目录
