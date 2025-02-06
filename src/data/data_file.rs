@@ -161,4 +161,5 @@ mod tests {
         data_file.write(b"222").unwrap();
         assert!(data_file.sync().is_ok());
     }
+
 }

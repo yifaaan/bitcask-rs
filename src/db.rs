@@ -132,8 +132,28 @@ impl Engine {
 
     /// 从数据库中删除数据
     pub fn delete(&self, key: Bytes) -> Result<()> {
-        // TODO:
-        unimplemented!()
+        if key.is_empty()
+        {
+            return Err(Error::KeyIsEmpty);
+        }
+
+        // 从内存索引中获取数据位置
+        let pos = self.index.get(key.to_vec());
+        if pos.is_none() {
+            return Ok(());
+        }
+        // 构造删除的log record
+        let mut log_record = LogRecord {
+            key: key.to_vec(),
+            value: Default::default(),
+            record_type: LogRecordType::DELETE,
+        };
+        let pos = self.append_log_record(&mut log_record)?;
+        // 更新内存索引
+        if !self.index.delete(key.to_vec()) {
+            return Err(Error::FailedToUpdateIndex);
+        }
+        Ok(())
     }
 
     /// 追加写入活跃数据文件
