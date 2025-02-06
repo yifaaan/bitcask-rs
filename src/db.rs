@@ -43,8 +43,8 @@ impl Engine {
         }
         // 加载目录中的数据文件
         let mut data_files: Vec<DataFile> = load_data_files(&dir_path)?;
-        // TODO: fix bug
-        // data_files.reverse();
+        // ID大的数据文件越新
+        data_files.reverse();
         let file_ids = data_files
             .iter()
             .map(|f| f.get_file_id())
@@ -132,8 +132,7 @@ impl Engine {
 
     /// 从数据库中删除数据
     pub fn delete(&self, key: Bytes) -> Result<()> {
-        if key.is_empty()
-        {
+        if key.is_empty() {
             return Err(Error::KeyIsEmpty);
         }
 

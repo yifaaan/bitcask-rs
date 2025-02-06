@@ -114,6 +114,8 @@ fn get_data_file_full_path(dir_path: impl AsRef<Path>, file_id: u32) -> PathBuf 
 
 #[cfg(test)]
 mod tests {
+    use crate::data::log_record::LogRecordType;
+
     use super::*;
 
     #[test]
@@ -162,4 +164,57 @@ mod tests {
         assert!(data_file.sync().is_ok());
     }
 
+    #[test]
+    fn test_data_file_read_log_record() {
+        let dir_path = std::env::temp_dir();
+        println!("dir_path: {}", dir_path.display());
+        let data_file = DataFile::new(&dir_path, 4).unwrap();
+        assert_eq!(data_file.get_file_id(), 4);
+
+        let log_record = LogRecord {
+            key: b"name".to_vec(),
+            value: b"bitcask-rs-kv".to_vec(),
+            record_type: LogRecordType::NORMAL,
+        };
+        let write_res = data_file.write(&log_record.encode());
+        assert!(write_res.is_ok());
+        // 24
+        // println!("first write_res: {}", write_res.unwrap());
+
+        // 从起始位置读取
+        let read_res = data_file.read_log_record(0);
+        assert!(read_res.is_ok());
+        let read_res = read_res.unwrap().record;
+        assert_eq!(log_record, read_res);
+
+        // 从中间位置读取
+        let log_record = LogRecord {
+            key: b"name".to_vec(),
+            value: b"new-value".to_vec(),
+            record_type: LogRecordType::NORMAL,
+        };
+        let write_res = data_file.write(&log_record.encode());
+        assert!(write_res.is_ok());
+        // 20
+        // println!("second write_res: {}", write_res.unwrap());
+        let read_res = data_file.read_log_record(24);
+        assert!(read_res.is_ok());
+        let read_res = read_res.unwrap().record;
+        assert_eq!(log_record, read_res);
+
+        // DELETE类型
+        let log_record = LogRecord {
+            key: b"name".to_vec(),
+            value: Default::default(),
+            record_type: LogRecordType::DELETE,
+        };
+        let write_res = data_file.write(&log_record.encode());
+        assert!(write_res.is_ok());
+        // 11
+        // println!("delete write_res: {}", write_res.unwrap());
+        let read_res = data_file.read_log_record(44);
+        assert!(read_res.is_ok());
+        let read_res = read_res.unwrap().record;
+        assert_eq!(log_record, read_res);
+    }
 }
