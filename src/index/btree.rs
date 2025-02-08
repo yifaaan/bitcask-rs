@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::data::log_record::LogRecordPos;
+use crate::options::IteratorOptions;
 
 use super::Indexer;
 
@@ -37,6 +38,18 @@ impl Indexer for BTree {
         remove_res.is_some()
     }
 }
+
+/// BTree索引的迭代器
+pub struct BTreeIterator {
+    /// key + pos
+    items: Vec<(Vec<u8>, LogRecordPos)>,
+    /// 当前索引
+    curr_idx: usize,
+    /// 迭代器选项
+    options: IteratorOptions,
+}
+
+impl IndexIterator 
 
 #[cfg(test)]
 mod tests {

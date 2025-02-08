@@ -289,3 +289,19 @@ fn load_data_files(dir_path: impl AsRef<Path>) -> Result<Vec<DataFile>> {
     }
     Ok(data_files)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_engine_put() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-put");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts).expect("failed to open engine");
+
+        let put_res = engine.put()
+    }    
+}
