@@ -413,4 +413,49 @@ mod tests {
         // 删除测试的文件夹
         std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
     } 
+
+    #[test]
+    fn test_engine_delete() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-delete");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        // 正常删除一条数据
+        let put_res = engine.put(get_test_key(11), get_test_value(11));
+        assert!(put_res.is_ok());
+        let delete_res = engine.delete(get_test_key(11));
+        assert!(delete_res.is_ok());
+        let get_res = engine.get(get_test_key(11));
+        assert!(get_res.err().unwrap() == Error::KeyNotFound);
+
+        // 删除一个不存在的key
+        let delete_res = engine.delete(get_test_key(22));
+        assert!(delete_res.is_ok());
+
+        // 删除空key
+        let delete_res = engine.delete(Bytes::new());
+        assert!(delete_res.err().unwrap() == Error::KeyIsEmpty);
+
+        // 删除后再次put
+        let put_res = engine.put(get_test_key(33), get_test_value(33));
+        assert!(put_res.is_ok());
+        let delete_res = engine.delete(get_test_key(33));
+        assert!(delete_res.is_ok());
+        let put_res = engine.put(get_test_key(33), Bytes::from("a new value"));
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(33));
+        assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
+        
+        // 重启数据库，再次put
+        std::mem::drop(engine);
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+        let get_res = engine.get(get_test_key(11));
+        assert!(get_res.err().unwrap() == Error::KeyNotFound);
+        let get_res = engine.get(get_test_key(33));
+        assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
+        
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
+    }
 }
