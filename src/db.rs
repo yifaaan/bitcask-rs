@@ -293,6 +293,10 @@ fn load_data_files(dir_path: impl AsRef<Path>) -> Result<Vec<DataFile>> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use crate::util::rand_kv::{get_test_key, get_test_value};
+
     use super::*;
     
     #[test]
@@ -300,8 +304,113 @@ mod tests {
         let mut opts = Options::default();
         opts.dir_path = PathBuf::from("/tmp/bitcask-rs-put");
         opts.data_file_size = 64 * 1024 * 1024;
-        let engine = Engine::open(opts).expect("failed to open engine");
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
 
-        let put_res = engine.put()
-    }    
+        // 正常put一条数据
+        let put_res = engine.put(get_test_key(11), get_test_value(11));
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(11));
+        assert!(get_res.is_ok());
+        assert!(get_res.unwrap().len() > 0);
+
+        // 重复put key相同的数据
+        let put_res = engine.put(get_test_key(22), get_test_value(22));
+        assert!(put_res.is_ok());
+        let put_res = engine.put(get_test_key(22), Bytes::from("a new value"));
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(22));
+        assert!(get_res.is_ok());
+        assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
+
+        // put空key
+        let put_res = engine.put(Bytes::new(), get_test_value(123));
+        assert!(put_res.err().unwrap() == Error::KeyIsEmpty);
+
+        // put空value
+        let put_res = engine.put(get_test_key(33), Bytes::new());
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(33));
+        assert!(get_res.is_ok());
+        assert_eq!(get_res.unwrap(), Bytes::new());
+
+        // 写到数据文件进行了转换
+        for i in 0..=1000000 {
+            let put_res = engine.put(get_test_key(i), get_test_value(i));
+            assert!(put_res.is_ok());
+        }
+        
+        // 重启数据库
+        std::mem::drop(engine);
+
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+        let put_res = engine.put(get_test_key(55), get_test_value(55));
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(55));
+        assert!(get_res.is_ok());
+        assert_eq!(get_res.unwrap(), get_test_value(55));
+
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
+    }   
+
+    #[test]
+    fn test_engine_get() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-get");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        // 正常get一条数据
+        let put_res = engine.put(get_test_key(111), get_test_value(111));
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(111));
+        assert!(get_res.is_ok());
+        assert!(get_res.unwrap().len() > 0);
+
+        // 读一个不存在的key
+        let get_res = engine.get(Bytes::from("not_exist_key"));
+        assert!(get_res.err().unwrap() == Error::KeyNotFound);
+
+        // 值被重复put后再读取
+        let put_res = engine.put(get_test_key(222), get_test_value(222));
+        assert!(put_res.is_ok());
+        let put_res = engine.put(get_test_key(222), Bytes::from("a new value"));
+        assert!(put_res.is_ok());
+        let get_res = engine.get(get_test_key(222));
+        assert!(get_res.is_ok());
+        assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
+        
+        // 值被删除后再get
+        let put_res = engine.put(get_test_key(333), get_test_value(333));
+        assert!(put_res.is_ok());
+        let delete_res = engine.delete(get_test_key(333));
+        assert!(delete_res.is_ok());
+        let get_res = engine.get(get_test_key(333));
+        assert!(get_res.err().unwrap() == Error::KeyNotFound);
+        
+        // 转换为旧的数据文件，从旧的数据文件获取value
+        for i in 500..=1000000 {
+            let put_res = engine.put(get_test_key(i), get_test_value(i));
+            assert!(put_res.is_ok());
+        }
+        let get_res = engine.get(get_test_key(555));
+        assert!(get_res.is_ok());
+        assert_eq!(get_res.unwrap(), get_test_value(555));
+
+        // 重启数据库后，之前写入的数据都能读到
+        std::mem::drop(engine);
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+        let get_res = engine.get(get_test_key(111));
+        assert_eq!(get_res.unwrap(), get_test_value(111));
+        let get_res = engine.get(get_test_key(222));
+        assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
+        let get_res = engine.get(get_test_key(333));
+        assert!(get_res.err().unwrap() == Error::KeyNotFound);
+        let get_res = engine.get(get_test_key(555));
+        assert_eq!(get_res.unwrap(), get_test_value(555));
+        
+
+        // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
+    } 
 }

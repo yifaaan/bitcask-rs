@@ -49,8 +49,6 @@ pub struct BTreeIterator {
     options: IteratorOptions,
 }
 
-impl IndexIterator 
-
 #[cfg(test)]
 mod tests {
     use super::*;

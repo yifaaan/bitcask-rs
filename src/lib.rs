@@ -4,3 +4,4 @@ mod error;
 mod fio;
 mod index;
 pub mod options;
+mod util;
