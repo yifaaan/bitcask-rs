@@ -32,10 +32,10 @@ impl Default for Options {
     }
 }
 
-
 pub struct IteratorOptions {
-    /// 前缀
+    /// key前缀
     pub(crate) prefix: Vec<u8>,
+
     /// 是否逆序
     pub(crate) reverse: bool,
 }

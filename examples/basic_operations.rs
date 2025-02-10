@@ -12,5 +12,7 @@ fn main() {
     let value = engine.get(Bytes::from("hello")).expect("failed to get");
     println!("value: {:?}", value);
 
-    // engine.delete(Bytes::from("hello")).expect("failed to delete");
+    engine
+        .delete(Bytes::from("hello"))
+        .expect("failed to delete");
 }

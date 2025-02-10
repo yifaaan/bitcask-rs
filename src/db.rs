@@ -290,7 +290,6 @@ fn load_data_files(dir_path: impl AsRef<Path>) -> Result<Vec<DataFile>> {
     Ok(data_files)
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -298,7 +297,7 @@ mod tests {
     use crate::util::rand_kv::{get_test_key, get_test_value};
 
     use super::*;
-    
+
     #[test]
     fn test_engine_put() {
         let mut opts = Options::default();
@@ -338,7 +337,7 @@ mod tests {
             let put_res = engine.put(get_test_key(i), get_test_value(i));
             assert!(put_res.is_ok());
         }
-        
+
         // 重启数据库
         std::mem::drop(engine);
 
@@ -351,7 +350,7 @@ mod tests {
 
         // 删除测试的文件夹
         std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
-    }   
+    }
 
     #[test]
     fn test_engine_get() {
@@ -379,7 +378,7 @@ mod tests {
         let get_res = engine.get(get_test_key(222));
         assert!(get_res.is_ok());
         assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
-        
+
         // 值被删除后再get
         let put_res = engine.put(get_test_key(333), get_test_value(333));
         assert!(put_res.is_ok());
@@ -387,7 +386,7 @@ mod tests {
         assert!(delete_res.is_ok());
         let get_res = engine.get(get_test_key(333));
         assert!(get_res.err().unwrap() == Error::KeyNotFound);
-        
+
         // 转换为旧的数据文件，从旧的数据文件获取value
         for i in 500..=1000000 {
             let put_res = engine.put(get_test_key(i), get_test_value(i));
@@ -408,11 +407,10 @@ mod tests {
         assert!(get_res.err().unwrap() == Error::KeyNotFound);
         let get_res = engine.get(get_test_key(555));
         assert_eq!(get_res.unwrap(), get_test_value(555));
-        
 
         // 删除测试的文件夹
         std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
-    } 
+    }
 
     #[test]
     fn test_engine_delete() {
@@ -446,7 +444,7 @@ mod tests {
         assert!(put_res.is_ok());
         let get_res = engine.get(get_test_key(33));
         assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
-        
+
         // 重启数据库，再次put
         std::mem::drop(engine);
         let engine = Engine::open(opts.clone()).expect("failed to open engine");
@@ -454,7 +452,7 @@ mod tests {
         assert!(get_res.err().unwrap() == Error::KeyNotFound);
         let get_res = engine.get(get_test_key(33));
         assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
-        
+
         // 删除测试的文件夹
         std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
     }
