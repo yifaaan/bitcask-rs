@@ -22,7 +22,7 @@ pub struct Engine {
     /// 旧数据文件
     older_files: Arc<RwLock<HashMap<u32, DataFile>>>,
     /// 内存索引
-    index: Box<dyn index::Indexer>,
+    pub(crate) index: Box<dyn index::Indexer>,
     /// 数据库启动时，数据文件ID
     file_ids: Vec<u32>,
 }
