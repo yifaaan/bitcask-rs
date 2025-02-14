@@ -110,6 +110,14 @@ impl Engine {
         }
     }
 
+    pub fn close(&self) -> Result<()> {
+        self.active_file.read().sync()
+    }
+
+    pub fn sync(&self) -> Result<()> {
+        self.active_file.read().sync()
+    }
+
     pub fn get_value_by_position(&self, pos: &LogRecordPos) -> Result<Bytes> {
         // 从数据文件中读取LogRecord数据
         let active_file = self.active_file.read();
@@ -456,6 +464,34 @@ mod tests {
         assert_eq!(get_res.unwrap(), Bytes::from("a new value"));
 
         // 删除测试的文件夹
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
+    }
+
+    #[test]
+    fn test_engine_close() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-close");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let put_res = engine.put(get_test_key(11), get_test_value(11));
+        assert!(put_res.is_ok());
+        let close_res = engine.close();
+        assert!(close_res.is_ok());
+        std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
+    }
+
+    #[test]
+    fn test_engine_sync() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-sync");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let put_res = engine.put(get_test_key(11), get_test_value(11));
+        assert!(put_res.is_ok());
+        let sync_res = engine.sync();
+        assert!(sync_res.is_ok());
         std::fs::remove_dir_all(opts.dir_path).expect("failed to remove test dir");
     }
 }

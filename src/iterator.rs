@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-use anyhow::Context;
 use bytes::Bytes;
 use parking_lot::RwLock;
 
-use crate::{
-    data::log_record::LogRecordPos, db::Engine, index::IndexInterator, options::IteratorOptions,
-};
+use crate::{db::Engine, error::Result, index::IndexInterator, options::IteratorOptions};
 
 pub struct Iterator<'a> {
     index_iter: Arc<RwLock<Box<dyn IndexInterator>>>,
@@ -14,11 +11,31 @@ pub struct Iterator<'a> {
 }
 
 impl Engine {
+    /// 用户迭代器
     pub fn iter(&self, options: IteratorOptions) -> Iterator {
         Iterator {
             index_iter: Arc::new(RwLock::new(self.index.iterator(options))),
             engine: self,
         }
+    }
+
+    /// 所有key
+    pub fn list_keys(&self) -> Result<Vec<Bytes>> {
+        self.index.list_keys()
+    }
+
+    ///
+    pub fn fold<F>(&self, f: F) -> Result<()>
+    where
+        F: Fn(Bytes, Bytes) -> bool,
+    {
+        let iter = self.iter(IteratorOptions::default());
+        while let Some((key, value)) = iter.next() {
+            if !f(key, value) {
+                break;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -59,6 +76,55 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_list_keys() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-iterator-list-keys");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        assert!(engine.list_keys().expect("list keys ok").is_empty());
+        engine.put("zzzzz".into(), "value1".into()).unwrap();
+        engine.put("aaabcd".into(), "value1".into()).unwrap();
+        engine.put("ababcd".into(), "value2".into()).unwrap();
+        engine.put("acabcd".into(), "value3".into()).unwrap();
+        engine.put("baabcd".into(), "value4".into()).unwrap();
+        engine.put("bbabcd".into(), "value5".into()).unwrap();
+        assert_eq!(
+            engine.list_keys().expect("list keys ok"),
+            ["aaabcd", "ababcd", "acabcd", "baabcd", "bbabcd", "zzzzz"]
+        );
+
+        std::fs::remove_dir_all(opts.clone().dir_path).expect("failed to remove dir");
+    }
+
+    #[test]
+    fn test_fold() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-iterator-fold");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        engine.put("zzzzz".into(), "value1".into()).unwrap();
+        engine.put("aaabcd".into(), "value1".into()).unwrap();
+        engine.put("ababcd".into(), "value2".into()).unwrap();
+        engine.put("acabcd".into(), "value3".into()).unwrap();
+        engine.put("baabcd".into(), "value4".into()).unwrap();
+        engine.put("bbabcd".into(), "value5".into()).unwrap();
+
+        engine
+            .fold(|k, v| {
+                if k.starts_with(b"b") {
+                    return false;
+                }
+                println!("{:?} {:?}", k, v);
+                true
+            })
+            .expect("fold ok");
+
+        std::fs::remove_dir_all(opts.clone().dir_path).expect("failed to remove dir");
+    }
 
     #[test]
     fn test_iterator_seek() {

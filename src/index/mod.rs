@@ -1,7 +1,10 @@
 pub mod btree;
 
+use bytes::Bytes;
+
 use crate::{
     data::log_record::LogRecordPos,
+    error::Result,
     options::{IndexType, IteratorOptions},
 };
 
@@ -18,6 +21,9 @@ pub trait Indexer: Send + Sync {
 
     /// 获取索引迭代器
     fn iterator(&self, options: IteratorOptions) -> Box<dyn IndexInterator>;
+
+    /// 获取所有key
+    fn list_keys(&self) -> Result<Vec<Bytes>>;
 }
 
 pub fn new_indexer(index_type: IndexType) -> impl Indexer {
