@@ -103,11 +103,14 @@ impl Engine {
             return Err(Error::KeyIsEmpty);
         }
         // 从内存索引中获取数据位置
-        let pos = self.index.get(key.to_vec());
-        if pos.is_none() {
-            return Err(Error::KeyNotFound);
+        if let Some(pos) = self.index.get(key.to_vec()) {
+            self.get_value_by_position(&pos)
+        } else {
+            Err(Error::KeyNotFound)
         }
-        let pos = pos.unwrap();
+    }
+
+    pub fn get_value_by_position(&self, pos: &LogRecordPos) -> Result<Bytes> {
         // 从数据文件中读取LogRecord数据
         let active_file = self.active_file.read();
         let older_files = self.older_files.read();
@@ -122,7 +125,6 @@ impl Engine {
                 older_file.read_log_record(pos.offset)?.record
             }
         };
-
         // 判断log record类型
         match log_record.record_type {
             LogRecordType::NORMAL => Ok(log_record.value.into()),

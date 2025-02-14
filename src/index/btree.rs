@@ -82,7 +82,7 @@ impl IndexInterator for BTreeIterator {
             }
         }) {
             Ok(position) => position,
-            Err(inster) => inster,
+            Err(insert_position) => insert_position,
         };
     }
 
