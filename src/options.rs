@@ -48,3 +48,17 @@ impl Default for IteratorOptions {
         }
     }
 }
+
+pub struct WriteOptions {
+    pub max_batch_size: usize,
+    pub sync_writes: bool,
+}
+
+impl Default for WriteOptions {
+    fn default() -> Self {
+        Self {
+            max_batch_size: 10000,
+            sync_writes: true,
+        }
+    }
+}

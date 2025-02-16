@@ -9,7 +9,7 @@ pub struct LogRecordPos {
 }
 
 /// log record 结构, 实际写入到数据文件的结构
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LogRecord {
     pub(crate) key: Vec<u8>,
     pub(crate) value: Vec<u8>,
@@ -72,8 +72,12 @@ impl LogRecord {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LogRecordType {
+    /// 正常的记录
     NORMAL = 1,
+    /// 删除的记录
     DELETE = 2,
+    /// 事务完成的记录
+    TXNFINISHED = 3,
 }
 
 impl From<u8> for LogRecordType {
@@ -81,6 +85,7 @@ impl From<u8> for LogRecordType {
         match value {
             1 => LogRecordType::NORMAL,
             2 => LogRecordType::DELETE,
+            3 => LogRecordType::TXNFINISHED,
             _ => unreachable!(),
         }
     }
@@ -91,6 +96,12 @@ impl From<u8> for LogRecordType {
 pub struct ReadLogRecord {
     pub record: LogRecord,
     pub size: usize,
+}
+
+/// 表示事务中提交的一条数据
+pub struct TransactionRecord {
+    pub(crate) record: LogRecord,
+    pub(crate) pos: LogRecordPos,
 }
 
 /// 获取log record header的最大大小

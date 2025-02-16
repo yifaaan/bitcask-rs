@@ -54,4 +54,7 @@ pub enum Error {
 
     #[error("Invalid log record CRC")]
     InvalidLogRecordCRC,
+
+    #[error("Batch too large")]
+    BatchTooLarge,
 }
