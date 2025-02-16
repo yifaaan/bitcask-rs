@@ -143,3 +143,103 @@ pub(crate) fn parse_log_record_key(key: &[u8]) -> Result<(Vec<u8>, usize)> {
     let seq_num = prost::decode_length_delimiter(&mut buf).unwrap();
     Ok((buf.to_vec(), seq_num))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::{
+        options::Options,
+        util::rand_kv::{get_test_key, get_test_value},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_write_batch_one() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-batch-1");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let wb = engine.new_write_batch(WriteOptions::default()).unwrap();
+
+        // 写入后未提交
+        wb.put(get_test_key(1), get_test_value(11)).unwrap();
+        wb.put(get_test_key(2), get_test_value(22)).unwrap();
+        let get_res = engine.get(get_test_key(1));
+        assert_eq!(get_res.err().unwrap(), Error::KeyNotFound);
+
+        // 提交
+        let commit_res = wb.commit();
+        assert!(commit_res.is_ok());
+
+        // 提交后读取
+        let get_res = engine.get(get_test_key(1));
+        assert_eq!(get_res.unwrap(), get_test_value(11));
+
+        // 验证事务序列号
+        assert_eq!(
+            wb.engine.seq_num.load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+
+        std::fs::remove_dir_all(opts.dir_path.clone()).unwrap();
+    }
+
+    #[test]
+    fn test_write_batch_two() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-batch-2");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        let wb = engine.new_write_batch(WriteOptions::default()).unwrap();
+
+        wb.put(get_test_key(1), get_test_value(11)).unwrap();
+        wb.put(get_test_key(2), get_test_value(22)).unwrap();
+        let commit_res = wb.commit();
+        assert!(commit_res.is_ok());
+
+        wb.put(get_test_key(3), get_test_value(33)).unwrap();
+        wb.put(get_test_key(4), get_test_value(44)).unwrap();
+        let commit_res = wb.commit();
+        assert!(commit_res.is_ok());
+        engine.close().unwrap();
+
+        // 重新打开数据库
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+        println!("{:#?}", engine.list_keys());
+        // 读取数据
+        let get_res = engine.get(get_test_key(1));
+        assert_eq!(get_res.unwrap(), get_test_value(11));
+
+        assert_eq!(
+            wb.engine.seq_num.load(std::sync::atomic::Ordering::SeqCst),
+            3
+        );
+
+        std::fs::remove_dir_all(opts.dir_path.clone()).unwrap();
+    }
+
+    #[test]
+    fn test_write_batch_three() {
+        let mut opts = Options::default();
+        opts.dir_path = PathBuf::from("/tmp/bitcask-rs-batch-3");
+        opts.data_file_size = 64 * 1024 * 1024;
+        let engine = Engine::open(opts.clone()).expect("failed to open engine");
+
+        println!("keys: {:?}", engine.list_keys());
+        // let mut wb_opts = WriteOptions::default();
+        // wb_opts.max_batch_size = 10000000;
+        // let wb = engine.new_write_batch(wb_opts).unwrap();
+
+        // for i in 0..=10000000 {
+        //     wb.put(get_test_key(i), get_test_value(i)).unwrap();
+        // }
+        // let commit_res = wb.commit();
+        // assert!(commit_res.is_ok());
+
+        std::fs::remove_dir_all(opts.dir_path.clone()).unwrap();
+    }
+}

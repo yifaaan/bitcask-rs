@@ -75,10 +75,15 @@ impl Engine {
             index: Box::new(index::new_indexer(index_type)),
             file_ids,
             batch_commit_lock: Mutex::new(()),
-            seq_num: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            seq_num: Arc::new(std::sync::atomic::AtomicUsize::new(1)),
         };
-        // 加载索引
-        engine.load_index_from_data_files()?;
+        // 加载索引，并更新事务序列号
+        let seq_num = engine.load_index_from_data_files()?;
+        if seq_num > 0 {
+            engine
+                .seq_num
+                .store(seq_num, std::sync::atomic::Ordering::SeqCst);
+        }
         Ok(engine)
     }
 
@@ -214,9 +219,10 @@ impl Engine {
     }
 
     /// 从数据文件中加载索引
-    fn load_index_from_data_files(&self) -> Result<()> {
+    fn load_index_from_data_files(&self) -> Result<usize> {
+        let mut current_seq_num = NON_TRANSACTION_SEQ_NUM;
         if self.file_ids.is_empty() {
-            return Ok(());
+            return Ok(current_seq_num);
         }
         // 事务批量写入的数据，暂存到内存中
         // seq_num -> records
@@ -287,6 +293,11 @@ impl Engine {
                     }
                 }
 
+                // 更新事务序列号
+                if seq_num > current_seq_num {
+                    current_seq_num = seq_num;
+                }
+
                 // 更新偏移量
                 offset += size as u64;
             }
@@ -295,7 +306,7 @@ impl Engine {
                 active_file.set_write_offset(offset);
             }
         }
-        Ok(())
+        Ok(current_seq_num)
     }
 
     fn update_index(&self, key: &[u8], record_type: LogRecordType, pos: LogRecordPos) {
@@ -307,10 +318,7 @@ impl Engine {
             LogRecordType::DELETE => {
                 self.index.delete(key.to_vec());
             }
-            // 事务结束
-            LogRecordType::TXNFINISHED => {
-                todo!()
-            }
+            _ => {}
         }
     }
 }
